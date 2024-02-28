@@ -1,0 +1,239 @@
+<script lang="ts">
+    import { rawData } from '$lib/data';
+    import { rawIDs } from '$lib/playerIDs';
+    import { send, receive } from '$lib/transition';
+    import { writable, type Writable } from 'svelte/store';
+    import { addRecords } from '$lib/algoliaAddRecord'
+
+    import { indexName, searchClient } from "$lib/algoliaClient";
+
+    interface Player {
+        name: string;
+        team: string;
+        age:  number;
+
+        fgm: number;
+        fga: number;
+        fgp: number;
+    }
+
+    function getFGM(playerData: string[]): number {
+        let FGM: number = 0;
+        for (let i = 1; i < playerData.length / 3; i++)
+            FGM += parseFloat(playerData[3 * i]);
+        return FGM;
+    }
+
+    function getFGA(playerData: string[]): number {
+        let FGA: number = 0;
+        for (let i = 1; i < playerData.length / 3; i++)
+            FGA += parseFloat(playerData[3 * i + 1]);
+        return FGA;
+    }
+
+    function getFGP(playerData: string[]): number {
+        let FGP: number = 0;
+        if (getFGM(playerData) / getFGA(playerData))
+            FGP = Math.round(getFGM(playerData) / getFGA(playerData) * 1000) / 10;
+        return FGP;
+    }
+
+    // allData includes headers
+    const allData: string[] = rawData.split("\n");
+    let players: Player[] = [];
+
+    // does not include headers
+    const playersData: string[] = allData.slice(2);
+
+    const allIDs: string[] = rawIDs.split("\n");
+
+    for (let i: number = 0; i < playersData.length; i++) {
+        const playerData: string[] = playersData[i].split(",");
+        let player: Player = {
+            name: playerData[0],
+            team: playerData[1],
+            age:  parseInt(playerData[2]),
+
+            fga: getFGA(playerData),
+            fgm: getFGM(playerData),
+            fgp: getFGP(playerData)
+        }
+        players[i] = player;
+    }
+
+    let userPlayer: Player = {
+        name: "Leo Liang",
+        team: "TOR",
+        age: 12,
+
+        fga: 0,
+        fgm: 0,
+        fgp: 0
+    }
+
+    players.push(userPlayer);
+
+	const { subscribe, update }: Writable<Player[]> = writable(players);
+    const playersStore = {
+        subscribe,
+        addOneUserScore: () => {
+            // let updatedUserPlayer: Player = {
+            //     name: "Leo Liang",
+            //     team: "TOR",
+            //     age: 12,
+
+            //     fga: userPlayer.fga++,
+            //     fgm: userPlayer.fgm++,
+            //     fgp: Math.round((userPlayer.fga + 1) / (userPlayer.fgm + 1) * 1000) / 10
+            // }
+
+			// update($players => [
+			// 	...$players.filter((p) => p.name !== userPlayer.name),
+			// 	updatedUserPlayer
+			// ]);
+
+            // update($players => returnSortedPlayers($players));
+
+            // update($players => returnSortedPlayers([
+			// 	...$players.filter((p) => p.name !== userPlayer.name),
+			// 	{ 
+            //         name: userPlayer.name,
+            //         team: userPlayer.team,
+            //         age: userPlayer.age,
+            //         fga: userPlayer.fga++,
+            //         fgm: userPlayer.fgm++,
+            //         fgp: Math.round((userPlayer.fga + 1) / (userPlayer.fgm + 1) * 1000) / 10
+            //     }
+			// ]));
+            
+            userPlayer = { 
+                    ...userPlayer,
+                    fga: userPlayer.fga+1,
+                    fgm: userPlayer.fgm+1,
+                    // get fgp() {
+                    //     return Math.round(this.fga / this.fgm * 1000) / 10
+                    // }
+                    fgp: Math.round((userPlayer.fgm+1) / (userPlayer.fga+1) * 1000) / 10
+                }
+            update($players => [
+				// { 
+                    // ...userPlayer,
+                    // fga: userPlayer.fga++,
+                    // fgm: userPlayer.fgm++,
+                    // get fgp() {
+                    //     return Math.round(this.fga / this.fgm * 1000) / 10
+                    // }
+                    // fgp: Math.round(fga / fgm * 1000) / 10
+                // },
+				...$players.filter((p) => p.name !== userPlayer.name),
+                userPlayer
+			]);
+            console.log({players, userPlayer})
+        },
+
+        remove: (player: Player) => {
+            update($players => $players.filter((p) => p.name !== player.name))
+        }
+    }
+    
+    // $: players, sortPlayers()
+    // $: players, playersStore;
+    // $: players, returnSortedPlayers(players);
+
+
+    // const sortPlayers = () => {
+    //     players.sort((a,b) => a.fgp - b.fgp).reverse();
+    //     players = players;
+    //     console.log("players", players);
+    //     console.log("store", playersStore);
+    // }
+
+    function returnSortedPlayers(players: Player[]) {
+        players.sort((a,b) => a.fgp - b.fgp).reverse();
+        players = players;
+        return players;
+    }
+
+    // function addOneUserScore() {
+    //     for (let i = 0; i < players.length; i++) {
+    //         if (players[i].name === userPlayer.name) {
+    //             players[i].fgm += 1;
+    //             players[i].fga += 1;
+    //             players[i].fgp = Math.round(players[i].fgm / players[i].fga * 1000) / 10;
+
+    //             sortPlayers()
+    //             break;
+
+    //         }
+    //     }
+    // }
+
+    function addZeroUserScore() {
+        for (let i = 0; i < players.length; i++) {
+            if (players[i].name === userPlayer.name) {
+                players[i].fga += 1;
+                players[i].fgp = Math.round(players[i].fgm / players[i].fga * 1000) / 10;
+
+                sortPlayers()
+                break;
+            }
+        }
+    }
+
+    function getPlayerID(name: string) {
+        for (let i = 0; i < allIDs.length; i++) {
+            let nameID: string[] = allIDs[i].split(",")
+            if (name === nameID[0]) {
+                return nameID[1];
+            }
+        }
+    }
+
+    // console.log(players);
+
+    addRecords(players);
+
+    export { Player };
+
+</script>
+
+<div class="w-1/2 p-5">
+	{#each $playersStore as player (player.name)}
+		<div
+			class="flex justify-between text-xl"
+			in:receive={{ key: player.name }}
+			out:send={{ key: player.name }}
+		>
+			<p>{player.name}</p>
+			<p>{player.fgp.toFixed(1)}</p>
+			{#if player.name != userPlayer.name}
+				<img
+					src="https://cdn.nba.com/headshots/nba/latest/1040x760/{getPlayerID(player.name)}.png"
+					class="object-cover h-18 w-24"
+					alt="player"
+				/>
+			{:else}
+				<img src="src/lib/leo-nba.png" class="object-cover h-18 w-24" alt="player" />
+			{/if}
+
+            
+			<!-- <p>{player.name}, {player.fgp.toFixed(1)}</p> -->
+            <button on:click={() => playersStore.remove(player)} aria-label="Remove">x</button>
+		</div>
+	{/each}
+
+	<!-- <div class="text-xl">
+		<button on:click={() => playersStore.addOneUserScore()}>+ 1</button>
+		<button on:click={addZeroUserScore}>+ 0</button>
+	</div> -->
+    <input
+        type="checkbox"
+        on:change={(e) => playersStore.addOneUserScore()}
+    />
+</div>
+
+<!-- <style>
+	button {
+		background-image: url($lib/remove.svg);
+	}
+</style> -->

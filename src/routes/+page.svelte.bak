@@ -1,0 +1,132 @@
+<script lang="ts">
+    import { rawData } from './data';
+    import {cloneDeep} from 'lodash';
+
+    interface zoneStats {
+        fgm: number;
+        fga: number;
+        fgp: number;
+    }
+
+    interface Player {
+        name: string;
+        team: string;
+        age:  number;
+
+        restrictedArea: zoneStats;
+        inThePaint:     zoneStats;
+        midRange:       zoneStats;
+        leftCorner3:    zoneStats;
+        rightCorner3:   zoneStats;
+        corner3:        zoneStats;
+        aboveTheBreak3: zoneStats;
+    }
+
+    const data: string[] = rawData.split("\n").slice(2);
+    let players: Player[] = [];
+
+    for (let i: number = 0; i < data.length; i++) {
+        const playerInfo: string[] = data[i].split(",");
+        let player: Player = {
+            name: playerInfo[0],
+            team: playerInfo[1],
+            age:  parseInt(playerInfo[2]),
+            restrictedArea: {
+                fga: parseFloat(playerInfo[3]),
+                fgm: parseFloat(playerInfo[4]),
+                fgp: parseFloat(playerInfo[5])
+            },
+            inThePaint: {
+                fga: parseFloat(playerInfo[6]),
+                fgm: parseFloat(playerInfo[7]),
+                fgp: parseFloat(playerInfo[8])
+            },
+            midRange: {
+                fga: parseFloat(playerInfo[9]),
+                fgm: parseFloat(playerInfo[10]),
+                fgp: parseFloat(playerInfo[11])
+            },
+            leftCorner3: {
+                fga: parseFloat(playerInfo[12]),
+                fgm: parseFloat(playerInfo[13]),
+                fgp: parseFloat(playerInfo[14])
+            },
+            rightCorner3: {
+                fga: parseFloat(playerInfo[15]),
+                fgm: parseFloat(playerInfo[16]),
+                fgp: parseFloat(playerInfo[17])
+            },
+            corner3: {
+                fga: parseFloat(playerInfo[18]),
+                fgm: parseFloat(playerInfo[19]),
+                fgp: parseFloat(playerInfo[20])
+            },
+            aboveTheBreak3: {
+                fga: parseFloat(playerInfo[21]),
+                fgm: parseFloat(playerInfo[22]),
+                fgp: parseFloat(playerInfo[23])
+            },
+        }
+        players[i] = player;
+        // console.log(player.team);
+    }
+
+    // for (let i = 0; i < players.length; i++) {
+    //     console.log(players[i]["name"])
+    // }
+
+    let playersRestrictedArea: Player[] = cloneDeep(players);
+
+    $: playersRestrictedArea, sortPlayers()
+
+    const sortPlayers = () => {
+        playersRestrictedArea.sort((a,b) => a.restrictedArea.fgp - b.restrictedArea.fgp).reverse();
+        playersRestrictedArea = playersRestrictedArea;
+    }
+
+    for (let i = 0; i < players.length; i++) {
+        console.log(playersRestrictedArea[i].name, playersRestrictedArea[i].restrictedArea.fgp)
+    }
+
+    function addOneUserScore() {
+        for (let i = 0; i < playersRestrictedArea.length; i++) {
+            // console.log(playersRestrictedArea[i].name);
+            if (playersRestrictedArea[i].name === "Leo Liang") {
+                playersRestrictedArea[i].restrictedArea.fgm += 1;
+                playersRestrictedArea[i].restrictedArea.fga += 1;
+                playersRestrictedArea[i].restrictedArea.fgp = playersRestrictedArea[i].restrictedArea.fgm / playersRestrictedArea[i].restrictedArea.fga * 100;
+
+                console.log(playersRestrictedArea[i].restrictedArea.fga + " " + playersRestrictedArea[i].restrictedArea.fgm + " " + playersRestrictedArea[i].restrictedArea.fgp);
+                sortPlayers()
+                break;
+
+            }
+        }
+    }
+    function addZeroUserScore() {
+        for (let i = 0; i < players.length; i++) {
+            // console.log(playersRestrictedArea[i].name);
+            if (playersRestrictedArea[i].name === "Leo Liang") {
+                playersRestrictedArea[i].restrictedArea.fga += 1;
+                playersRestrictedArea[i].restrictedArea.fgp = playersRestrictedArea[i].restrictedArea.fgm / playersRestrictedArea[i].restrictedArea.fga * 100;
+
+                console.log(playersRestrictedArea[i].restrictedArea.fga + " " + playersRestrictedArea[i].restrictedArea.fgm + " " + playersRestrictedArea[i].restrictedArea.fgp);
+                sortPlayers()
+                break;
+            }
+        }
+    }
+    
+</script>
+
+{#each playersRestrictedArea as player}
+    <p>{player.name}, {player.restrictedArea.fgp}</p>
+{/each}
+
+<button on:click={addOneUserScore}>+ 1</button>
+<button on:click={addZeroUserScore}>+ 0</button>
+
+
+<h1>Ballin TS</h1>
+<p>Visit <a href="https://kit.svelte.dev">kit.svelte.dev</a> to read the documentation</p>
+<p>Hello!</p>
