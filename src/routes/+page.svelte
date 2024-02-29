@@ -1,20 +1,23 @@
 <script lang="ts">
-    import { rawData } from '$lib/data';
-    import { rawIDs } from '$lib/playerIDs';
-    import { send, receive } from '$lib/transition';
-    import { writable, type Writable } from 'svelte/store';
-    import { addRecords } from '$lib/algoliaAddRecord'
+    // import { rawData } from "$lib/data";
+    import { rawData } from "$lib/players-2024-playoffs";
+    import { rawIDs } from "$lib/playerIDs";
+    import { send, receive } from "$lib/transition";
+    import { writable, type Writable } from "svelte/store";
+    import { addRecords } from "$lib/algoliaAddRecord";
 
-    import { indexName, searchClient } from "$lib/algoliaClient";
+    import { searchClient } from "$lib/algoliaClient";
 
     interface Player {
         name: string;
         team: string;
-        age:  number;
+        age: number;
 
         fgm: number;
         fga: number;
         fgp: number;
+
+        img: string;
     }
 
     function getFGM(playerData: string[]): number {
@@ -34,7 +37,7 @@
     function getFGP(playerData: string[]): number {
         let FGP: number = 0;
         if (getFGM(playerData) / getFGA(playerData))
-            FGP = Math.round(getFGM(playerData) / getFGA(playerData) * 1000) / 10;
+            FGP = Math.round((getFGM(playerData) / getFGA(playerData)) * 1000) / 10;
         return FGP;
     }
 
@@ -52,12 +55,14 @@
         let player: Player = {
             name: playerData[0],
             team: playerData[1],
-            age:  parseInt(playerData[2]),
+            age: parseInt(playerData[2]),
 
             fga: getFGA(playerData),
             fgm: getFGM(playerData),
-            fgp: getFGP(playerData)
-        }
+            fgp: getFGP(playerData),
+
+            img: "https://cdn.nba.com/headshots/nba/latest/1040x760/"+getPlayerID(playerData[0])+".png"
+        };
         players[i] = player;
     }
 
@@ -68,121 +73,100 @@
 
         fga: 0,
         fgm: 0,
-        fgp: 0
-    }
+        fgp: 0,
+
+        img: "src/lib/leo-nba.png"
+    };
 
     players.push(userPlayer);
+    quickSortPlayers(players, 0, players.length - 1);
 
-	const { subscribe, update }: Writable<Player[]> = writable(players);
+    // players = quickSortPlayers(players, 0, players.length - 1);
+
+    const { subscribe, update }: Writable<Player[]> = writable(players);
+    
     const playersStore = {
         subscribe,
         addOneUserScore: () => {
-            // let updatedUserPlayer: Player = {
-            //     name: "Leo Liang",
-            //     team: "TOR",
-            //     age: 12,
+            userPlayer = {
+                ...userPlayer,
+                fga: userPlayer.fga + 1,
+                fgm: userPlayer.fgm + 1,
+                fgp:
+                    Math.round(
+                        ((userPlayer.fgm + 1) / (userPlayer.fga + 1)) * 1000
+                    ) / 10,
+            };
+            update((p) => [
+                ...p.filter((p) => p.name !== userPlayer.name),
+                userPlayer,
+            ]);
+            console.log({ players, userPlayer });
 
-            //     fga: userPlayer.fga++,
-            //     fgm: userPlayer.fgm++,
-            //     fgp: Math.round((userPlayer.fga + 1) / (userPlayer.fgm + 1) * 1000) / 10
-            // }
+            update((p) => quickSortPlayers(p, 0, p.length - 1));
+        },
+        addZeroUserScore: () => {
+            userPlayer = {
+                ...userPlayer,
+                fga: userPlayer.fga + 1,
+                fgm: userPlayer.fgm,
+                fgp:
+                    Math.round(
+                        ((userPlayer.fgm) / (userPlayer.fga + 1)) * 1000
+                    ) / 10,
+            };
+            update(($players) => [
+                ...$players.filter((p) => p.name !== userPlayer.name),
+                userPlayer,
+            ]);
+            console.log({ players, userPlayer });
 
-			// update($players => [
-			// 	...$players.filter((p) => p.name !== userPlayer.name),
-			// 	updatedUserPlayer
-			// ]);
+            update((p) => quickSortPlayers(p, 0, p.length - 1));
+            $playersStore = $playersStore;
 
-            // update($players => returnSortedPlayers($players));
-
-            // update($players => returnSortedPlayers([
-			// 	...$players.filter((p) => p.name !== userPlayer.name),
-			// 	{ 
-            //         name: userPlayer.name,
-            //         team: userPlayer.team,
-            //         age: userPlayer.age,
-            //         fga: userPlayer.fga++,
-            //         fgm: userPlayer.fgm++,
-            //         fgp: Math.round((userPlayer.fga + 1) / (userPlayer.fgm + 1) * 1000) / 10
-            //     }
-			// ]));
-            
-            userPlayer = { 
-                    ...userPlayer,
-                    fga: userPlayer.fga+1,
-                    fgm: userPlayer.fgm+1,
-                    // get fgp() {
-                    //     return Math.round(this.fga / this.fgm * 1000) / 10
-                    // }
-                    fgp: Math.round((userPlayer.fgm+1) / (userPlayer.fga+1) * 1000) / 10
-                }
-            update($players => [
-				// { 
-                    // ...userPlayer,
-                    // fga: userPlayer.fga++,
-                    // fgm: userPlayer.fgm++,
-                    // get fgp() {
-                    //     return Math.round(this.fga / this.fgm * 1000) / 10
-                    // }
-                    // fgp: Math.round(fga / fgm * 1000) / 10
-                // },
-				...$players.filter((p) => p.name !== userPlayer.name),
-                userPlayer
-			]);
-            console.log({players, userPlayer})
         },
 
         remove: (player: Player) => {
-            update($players => $players.filter((p) => p.name !== player.name))
-        }
-    }
-    
-    // $: players, sortPlayers()
-    // $: players, playersStore;
-    // $: players, returnSortedPlayers(players);
+            update(($players) =>
+                $players.filter((p) => p.name !== player.name)
+            );
+        },
+    };
 
-
-    // const sortPlayers = () => {
-    //     players.sort((a,b) => a.fgp - b.fgp).reverse();
-    //     players = players;
-    //     console.log("players", players);
-    //     console.log("store", playersStore);
-    // }
-
-    function returnSortedPlayers(players: Player[]) {
-        players.sort((a,b) => a.fgp - b.fgp).reverse();
-        players = players;
-        return players;
-    }
-
-    // function addOneUserScore() {
-    //     for (let i = 0; i < players.length; i++) {
-    //         if (players[i].name === userPlayer.name) {
-    //             players[i].fgm += 1;
-    //             players[i].fga += 1;
-    //             players[i].fgp = Math.round(players[i].fgm / players[i].fga * 1000) / 10;
-
-    //             sortPlayers()
-    //             break;
-
-    //         }
-    //     }
-    // }
-
-    function addZeroUserScore() {
-        for (let i = 0; i < players.length; i++) {
-            if (players[i].name === userPlayer.name) {
-                players[i].fga += 1;
-                players[i].fgp = Math.round(players[i].fgm / players[i].fga * 1000) / 10;
-
-                sortPlayers()
-                break;
+    function quickSortPlayers(players: Player[], left: number, right: number): Player[] {
+        let l = left;
+        let r = right;
+        
+        let p = players[Math.floor((l + r) / 2)].fgp;
+        
+        while (l <= r) {
+            while (players[l].fgp > p) {
+                l++;
+            }
+            while (players[r].fgp < p) {
+                r--;
+            }
+            
+            if (l <= r) {
+                [players[l], players[r]] = [players[r], players[l]];
+                l++;
+                r--;
             }
         }
+        if (left < r) 
+            quickSortPlayers(players, left, r);
+        if (l < right)
+            quickSortPlayers(players, l, right);
+
+        return players;
+
+        // players = players;
+        // update(($players) => players);
     }
 
     function getPlayerID(name: string) {
         for (let i = 0; i < allIDs.length; i++) {
-            let nameID: string[] = allIDs[i].split(",")
+            let nameID: string[] = allIDs[i].split(",");
             if (name === nameID[0]) {
                 return nameID[1];
             }
@@ -191,45 +175,58 @@
 
     // console.log(players);
 
-    addRecords(players);
+    let indexName: string = 'players-2024-playoffs';
+    addRecords(players, indexName);
+
+    // let userIndexName: string = 'user-index-0';
+    
+
+
 
     export { Player };
-
 </script>
 
+
+
+
+
 <div class="w-1/2 p-5">
-	{#each $playersStore as player (player.name)}
-		<div
-			class="flex justify-between text-xl"
-			in:receive={{ key: player.name }}
-			out:send={{ key: player.name }}
-		>
-			<p>{player.name}</p>
-			<p>{player.fgp.toFixed(1)}</p>
-			{#if player.name != userPlayer.name}
-				<img
-					src="https://cdn.nba.com/headshots/nba/latest/1040x760/{getPlayerID(player.name)}.png"
-					class="object-cover h-18 w-24"
-					alt="player"
-				/>
-			{:else}
-				<img src="src/lib/leo-nba.png" class="object-cover h-18 w-24" alt="player" />
-			{/if}
+    {#each $playersStore as player (player?.name)}
+        <div
+            class="flex justify-between text-xl"
+            in:receive={{ key: player.name }}
+            out:send={{ key: player.name }}
+        >
+            <p>{player.name}</p>
+            <p>{player.fgp.toFixed(1)}</p>
+            {#if player.name != userPlayer.name}
+                <img
+                    src="https://cdn.nba.com/headshots/nba/latest/1040x760/{getPlayerID(
+                        player.name
+                    )}.png"
+                    class="object-cover h-18 w-24"
+                    alt="player"
+                />
+            {:else}
+                <img
+                    src="src/lib/leo-nba.png"
+                    class="object-cover h-18 w-24"
+                    alt="player"
+                />
+            {/if}
 
-            
-			<!-- <p>{player.name}, {player.fgp.toFixed(1)}</p> -->
-            <button on:click={() => playersStore.remove(player)} aria-label="Remove">x</button>
-		</div>
-	{/each}
+            <!-- <p>{player.name}, {player.fgp.toFixed(1)}</p> -->
+            <button
+                on:click={() => playersStore.remove(player)}
+                aria-label="Remove">x</button
+            >
+        </div>
+    {/each}
 
-	<!-- <div class="text-xl">
+    <div class="text-xl">
 		<button on:click={() => playersStore.addOneUserScore()}>+ 1</button>
-		<button on:click={addZeroUserScore}>+ 0</button>
-	</div> -->
-    <input
-        type="checkbox"
-        on:change={(e) => playersStore.addOneUserScore()}
-    />
+		<button on:click={() => playersStore.addZeroUserScore()}>+ 0</button>
+	</div>
 </div>
 
 <!-- <style>

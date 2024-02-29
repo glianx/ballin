@@ -1,0 +1,47 @@
+<script lang="ts">
+    let arr: number [] = [9,6,2,5,4,1,7,2,3,8];
+    // 9 6 2 5 *4 1 7 0 3 8
+    // 8 6 2 5 *4 1 7 0 3 9
+    // 3 6 2 5 *4 1 7 0 8 9
+    // 3 0 2 5 *4 1 7 6 8 9
+    // 3 0 2 7 *4 1 5 6 8 9
+    // 3 0 2 1 *4 7 5 6 8 9
+    //3 0 2 1 4 | 7 5 *6 8 9
+
+    // 0 3 9 8 7 6 2 5 4
+    // 
+
+
+    quickSort(arr, 0, arr.length - 1);
+    console.table([arr]);
+
+    function quickSort(arr: number[], left: number, right: number) {
+        let l = left;
+        let r = right;
+        
+        let p = arr[Math.floor((l + r) / 2)];
+        
+        while (l <= r) {
+            while (arr[l] < p) {
+                l++;
+            }
+            while (arr[r] > p) {
+                r--;
+            }
+            
+            if (l <= r) {
+                [arr[l], arr[r]] = [arr[r], arr[l]];
+                l++;
+                r--;
+            }
+        }
+        if (left < r) 
+            quickSort(arr, left, r);
+        if (l < right)
+            quickSort(arr, l, right);
+    }
+</script>
+
+<div>
+    <p>{arr}</p>
+</div>

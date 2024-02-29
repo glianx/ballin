@@ -1,132 +1,239 @@
 <script lang="ts">
-    import { rawData } from './data';
-    import {cloneDeep} from 'lodash';
+    import { rawData } from '$lib/data';
+    import { rawIDs } from '$lib/playerIDs';
+    import { send, receive } from '$lib/transition';
+    import { writable, type Writable } from 'svelte/store';
+    import { addRecords } from '$lib/algoliaAddRecord'
 
-    interface zoneStats {
-        fgm: number;
-        fga: number;
-        fgp: number;
-    }
+    import { indexName, searchClient } from "$lib/algoliaClient";
 
     interface Player {
         name: string;
         team: string;
         age:  number;
 
-        restrictedArea: zoneStats;
-        inThePaint:     zoneStats;
-        midRange:       zoneStats;
-        leftCorner3:    zoneStats;
-        rightCorner3:   zoneStats;
-        corner3:        zoneStats;
-        aboveTheBreak3: zoneStats;
+        fgm: number;
+        fga: number;
+        fgp: number;
     }
 
-    const data: string[] = rawData.split("\n").slice(2);
+    function getFGM(playerData: string[]): number {
+        let FGM: number = 0;
+        for (let i = 1; i < playerData.length / 3; i++)
+            FGM += parseFloat(playerData[3 * i]);
+        return FGM;
+    }
+
+    function getFGA(playerData: string[]): number {
+        let FGA: number = 0;
+        for (let i = 1; i < playerData.length / 3; i++)
+            FGA += parseFloat(playerData[3 * i + 1]);
+        return FGA;
+    }
+
+    function getFGP(playerData: string[]): number {
+        let FGP: number = 0;
+        if (getFGM(playerData) / getFGA(playerData))
+            FGP = Math.round(getFGM(playerData) / getFGA(playerData) * 1000) / 10;
+        return FGP;
+    }
+
+    // allData includes headers
+    const allData: string[] = rawData.split("\n");
     let players: Player[] = [];
 
-    for (let i: number = 0; i < data.length; i++) {
-        const playerInfo: string[] = data[i].split(",");
+    // does not include headers
+    const playersData: string[] = allData.slice(2);
+
+    const allIDs: string[] = rawIDs.split("\n");
+
+    for (let i: number = 0; i < playersData.length; i++) {
+        const playerData: string[] = playersData[i].split(",");
         let player: Player = {
-            name: playerInfo[0],
-            team: playerInfo[1],
-            age:  parseInt(playerInfo[2]),
-            restrictedArea: {
-                fga: parseFloat(playerInfo[3]),
-                fgm: parseFloat(playerInfo[4]),
-                fgp: parseFloat(playerInfo[5])
-            },
-            inThePaint: {
-                fga: parseFloat(playerInfo[6]),
-                fgm: parseFloat(playerInfo[7]),
-                fgp: parseFloat(playerInfo[8])
-            },
-            midRange: {
-                fga: parseFloat(playerInfo[9]),
-                fgm: parseFloat(playerInfo[10]),
-                fgp: parseFloat(playerInfo[11])
-            },
-            leftCorner3: {
-                fga: parseFloat(playerInfo[12]),
-                fgm: parseFloat(playerInfo[13]),
-                fgp: parseFloat(playerInfo[14])
-            },
-            rightCorner3: {
-                fga: parseFloat(playerInfo[15]),
-                fgm: parseFloat(playerInfo[16]),
-                fgp: parseFloat(playerInfo[17])
-            },
-            corner3: {
-                fga: parseFloat(playerInfo[18]),
-                fgm: parseFloat(playerInfo[19]),
-                fgp: parseFloat(playerInfo[20])
-            },
-            aboveTheBreak3: {
-                fga: parseFloat(playerInfo[21]),
-                fgm: parseFloat(playerInfo[22]),
-                fgp: parseFloat(playerInfo[23])
-            },
+            name: playerData[0],
+            team: playerData[1],
+            age:  parseInt(playerData[2]),
+
+            fga: getFGA(playerData),
+            fgm: getFGM(playerData),
+            fgp: getFGP(playerData)
         }
         players[i] = player;
-        // console.log(player.team);
     }
 
-    // for (let i = 0; i < players.length; i++) {
-    //     console.log(players[i]["name"])
-    // }
+    let userPlayer: Player = {
+        name: "Leo Liang",
+        team: "TOR",
+        age: 12,
 
-    let playersRestrictedArea: Player[] = cloneDeep(players);
-
-    $: playersRestrictedArea, sortPlayers()
-
-    const sortPlayers = () => {
-        playersRestrictedArea.sort((a,b) => a.restrictedArea.fgp - b.restrictedArea.fgp).reverse();
-        playersRestrictedArea = playersRestrictedArea;
+        fga: 0,
+        fgm: 0,
+        fgp: 0
     }
 
-    for (let i = 0; i < players.length; i++) {
-        console.log(playersRestrictedArea[i].name, playersRestrictedArea[i].restrictedArea.fgp)
-    }
+    players.push(userPlayer);
 
-    function addOneUserScore() {
-        for (let i = 0; i < playersRestrictedArea.length; i++) {
-            // console.log(playersRestrictedArea[i].name);
-            if (playersRestrictedArea[i].name === "Leo Liang") {
-                playersRestrictedArea[i].restrictedArea.fgm += 1;
-                playersRestrictedArea[i].restrictedArea.fga += 1;
-                playersRestrictedArea[i].restrictedArea.fgp = playersRestrictedArea[i].restrictedArea.fgm / playersRestrictedArea[i].restrictedArea.fga * 100;
+	const { subscribe, update }: Writable<Player[]> = writable(players);
+    const playersStore = {
+        subscribe,
+        addOneUserScore: () => {
+            // let updatedUserPlayer: Player = {
+            //     name: "Leo Liang",
+            //     team: "TOR",
+            //     age: 12,
 
-                console.log(playersRestrictedArea[i].restrictedArea.fga + " " + playersRestrictedArea[i].restrictedArea.fgm + " " + playersRestrictedArea[i].restrictedArea.fgp);
-                sortPlayers()
-                break;
+            //     fga: userPlayer.fga++,
+            //     fgm: userPlayer.fgm++,
+            //     fgp: Math.round((userPlayer.fga + 1) / (userPlayer.fgm + 1) * 1000) / 10
+            // }
 
-            }
-        }
-    }
-    function addZeroUserScore() {
-        for (let i = 0; i < players.length; i++) {
-            // console.log(playersRestrictedArea[i].name);
-            if (playersRestrictedArea[i].name === "Leo Liang") {
-                playersRestrictedArea[i].restrictedArea.fga += 1;
-                playersRestrictedArea[i].restrictedArea.fgp = playersRestrictedArea[i].restrictedArea.fgm / playersRestrictedArea[i].restrictedArea.fga * 100;
+			// update($players => [
+			// 	...$players.filter((p) => p.name !== userPlayer.name),
+			// 	updatedUserPlayer
+			// ]);
 
-                console.log(playersRestrictedArea[i].restrictedArea.fga + " " + playersRestrictedArea[i].restrictedArea.fgm + " " + playersRestrictedArea[i].restrictedArea.fgp);
-                sortPlayers()
-                break;
-            }
+            // update($players => returnSortedPlayers($players));
+
+            // update($players => returnSortedPlayers([
+			// 	...$players.filter((p) => p.name !== userPlayer.name),
+			// 	{ 
+            //         name: userPlayer.name,
+            //         team: userPlayer.team,
+            //         age: userPlayer.age,
+            //         fga: userPlayer.fga++,
+            //         fgm: userPlayer.fgm++,
+            //         fgp: Math.round((userPlayer.fga + 1) / (userPlayer.fgm + 1) * 1000) / 10
+            //     }
+			// ]));
+            
+            userPlayer = { 
+                    ...userPlayer,
+                    fga: userPlayer.fga+1,
+                    fgm: userPlayer.fgm+1,
+                    // get fgp() {
+                    //     return Math.round(this.fga / this.fgm * 1000) / 10
+                    // }
+                    fgp: Math.round((userPlayer.fgm+1) / (userPlayer.fga+1) * 1000) / 10
+                }
+            update($players => [
+				// { 
+                    // ...userPlayer,
+                    // fga: userPlayer.fga++,
+                    // fgm: userPlayer.fgm++,
+                    // get fgp() {
+                    //     return Math.round(this.fga / this.fgm * 1000) / 10
+                    // }
+                    // fgp: Math.round(fga / fgm * 1000) / 10
+                // },
+				...$players.filter((p) => p.name !== userPlayer.name),
+                userPlayer
+			]);
+            console.log({players, userPlayer})
+        },
+
+        remove: (player: Player) => {
+            update($players => $players.filter((p) => p.name !== player.name))
         }
     }
     
+    $: players, sortPlayers()
+    // $: players, playersStore;
+    // $: players, returnSortedPlayers(players);
+
+
+    const sortPlayers = () => {
+        players.sort((a,b) => a.fgp - b.fgp).reverse();
+        players = players;
+        // console.log("players", players);
+        // console.log("store", playersStore);
+    }
+
+    // function returnSortedPlayers(players: Player[]) {
+    //     players.sort((a,b) => a.fgp - b.fgp).reverse();
+    //     players = players;
+    //     return players;
+    // }
+
+    // function addOneUserScore() {
+    //     for (let i = 0; i < players.length; i++) {
+    //         if (players[i].name === userPlayer.name) {
+    //             players[i].fgm += 1;
+    //             players[i].fga += 1;
+    //             players[i].fgp = Math.round(players[i].fgm / players[i].fga * 1000) / 10;
+
+    //             sortPlayers()
+    //             break;
+
+    //         }
+    //     }
+    // }
+
+    function addZeroUserScore() {
+        for (let i = 0; i < players.length; i++) {
+            if (players[i].name === userPlayer.name) {
+                players[i].fga += 1;
+                players[i].fgp = Math.round(players[i].fgm / players[i].fga * 1000) / 10;
+
+                sortPlayers()
+                break;
+            }
+        }
+    }
+
+    function getPlayerID(name: string) {
+        for (let i = 0; i < allIDs.length; i++) {
+            let nameID: string[] = allIDs[i].split(",")
+            if (name === nameID[0]) {
+                return nameID[1];
+            }
+        }
+    }
+
+    // console.log(players);
+
+    addRecords(players);
+
+    export { Player };
+
 </script>
 
-{#each playersRestrictedArea as player}
-    <p>{player.name}, {player.restrictedArea.fgp}</p>
-{/each}
+<div class="w-1/2 p-5">
+	{#each $playersStore as player (player.name)}
+		<div
+			class="flex justify-between text-xl"
+			in:receive={{ key: player.name }}
+			out:send={{ key: player.name }}
+		>
+			<p>{player.name}</p>
+			<p>{player.fgp.toFixed(1)}</p>
+			{#if player.name != userPlayer.name}
+				<img
+					src="https://cdn.nba.com/headshots/nba/latest/1040x760/{getPlayerID(player.name)}.png"
+					class="object-cover h-18 w-24"
+					alt="player"
+				/>
+			{:else}
+				<img src="src/lib/leo-nba.png" class="object-cover h-18 w-24" alt="player" />
+			{/if}
 
-<button on:click={addOneUserScore}>+ 1</button>
-<button on:click={addZeroUserScore}>+ 0</button>
+            
+			<!-- <p>{player.name}, {player.fgp.toFixed(1)}</p> -->
+            <button on:click={() => playersStore.remove(player)} aria-label="Remove">x</button>
+		</div>
+	{/each}
 
+	<!-- <div class="text-xl">
+		<button on:click={() => playersStore.addOneUserScore()}>+ 1</button>
+		<button on:click={addZeroUserScore}>+ 0</button>
+	</div> -->
+    <input
+        type="checkbox"
+        on:change={(e) => playersStore.addOneUserScore()}
+    />
+</div>
 
-<h1>Ballin TS</h1>
-<p>Visit <a href="https://kit.svelte.dev">kit.svelte.dev</a> to read the documentation</p>
-<p>Hello!</p>
+<!-- <style>
+	button {
+		background-image: url($lib/remove.svg);
+	}
+</style> -->

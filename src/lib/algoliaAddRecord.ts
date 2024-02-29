@@ -1,7 +1,7 @@
-import { indexName, searchClient } from "$lib/algoliaClient";
+import { searchClient } from "$lib/algoliaClient";
 import type { Player } from "src/routes/+page.svelte";
 
-export function addRecords(players: Player[]): void {
+export function addRecords(players: Player[], indexName: string): void {
     // Create a new index if it does not exist and add a record
     const index = searchClient.initIndex(indexName)
 
@@ -15,7 +15,9 @@ export function addRecords(players: Player[]): void {
             
             fgm:  player.fgm,
             fga:  player.fga,
-            fgp:  player.fgp
+            fgp:  player.fgp, 
+
+            img: player.img
         }
         index.saveObject(record).wait()
     }
