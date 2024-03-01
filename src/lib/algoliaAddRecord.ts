@@ -1,5 +1,6 @@
 import { searchClient } from "$lib/algoliaClient";
 import type { Player } from "src/routes/+page.svelte";
+import { getPlayerID } from "$lib/getIDs"
 
 export function addRecords(players: Player[], indexName: string): void {
     // Create a new index if it does not exist and add a record
@@ -8,7 +9,7 @@ export function addRecords(players: Player[], indexName: string): void {
     for (let i = 0; i < players.length; i++) {
         const player: Player = players[i];
         const record = { 
-            objectID: i, 
+            objectID: getPlayerID(player.name), 
             name: player.name,
             team: player.team,
             age:  player.age,
