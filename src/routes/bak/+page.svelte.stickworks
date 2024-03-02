@@ -1,0 +1,329 @@
+<script lang="ts">
+    // import { rawData } from "$lib/data";
+    let indexName: string = "playerPack2024regularSeason";
+    import { rawData } from "$lib/playerPacks/playerPack2024allStar";
+    import { rawIDs as rawPlayerIDs } from "$lib/playerIDs";
+    import { rawIDs as rawTeamIDs } from "$lib/teamIDs";
+
+    import { getPlayerID, getTeamID, getTeamName } from "$lib/getIDs";
+
+    import { send, receive } from "$lib/transition";
+    import { writable, type Writable } from "svelte/store";
+    import { addRecords } from "$lib/algoliaAddRecord";
+
+    import { searchClient } from "$lib/algolia/algoliaClient";
+
+    interface Player {
+        name: string;
+        team: string;
+        age: number;
+
+        fgm: number;
+        fga: number;
+        fgp: number | null;
+
+        img: string;
+    }
+
+    function getFGM(playerData: string[]): number {
+        let FGM: number = 0;
+        for (let i = 1; i < playerData.length / 3; i++)
+            FGM += parseFloat(playerData[3 * i]);
+        return FGM;
+    }
+
+    function getFGA(playerData: string[]): number {
+        let FGA: number = 0;
+        for (let i = 1; i < playerData.length / 3; i++)
+            FGA += parseFloat(playerData[3 * i + 1]);
+        return FGA;
+    }
+
+    function getFGP(playerData: string[]): number {
+        let FGP: number = 0;
+        if (getFGM(playerData) / getFGA(playerData))
+            FGP =
+                Math.round((getFGM(playerData) / getFGA(playerData)) * 1000) /
+                10;
+        return FGP;
+    }
+
+    // allData includes headers
+    const allData: string[] = rawData.split("\n");
+    let players: Player[] = [];
+
+    // does not include headers
+    const playersData: string[] = allData.slice(2);
+
+    const playerIDs: string[] = rawPlayerIDs.split("\n");
+    const teamIDs: string[] = rawTeamIDs.split("\n");
+
+    let i = 0;
+    let j = 0;
+    while (i < playersData.length) {
+        const playerData: string[] = playersData[i].split(",");
+        if (getPlayerID(playerData[0]) != "") {
+            let player: Player = {
+                name: playerData[0],
+                team: playerData[1],
+                age: parseInt(playerData[2]),
+
+                fga: getFGA(playerData),
+                fgm: getFGM(playerData),
+                fgp: getFGP(playerData),
+
+                img:
+                    "https://cdn.nba.com/headshots/nba/latest/1040x760/" +
+                    getPlayerID(playerData[0]) +
+                    ".png",
+            };
+            players[j] = player;
+            j++;
+        }
+        i++;
+    }
+
+    let userPlayer: Player = {
+        name: "Leo Liang",
+        team: "TOR",
+        age: 12,
+
+        fga: 0,
+        fgm: 0,
+        fgp: null,
+
+        img: "src/lib/leo-nba.png",
+    };
+
+    players.push(userPlayer);
+    quickSortPlayers(players, 0, players.length - 1);
+
+    // players = quickSortPlayers(players, 0, players.length - 1);
+
+    const { subscribe, update }: Writable<Player[]> = writable(players);
+
+    const playersStore = {
+        subscribe,
+        addOneUserScore: () => {
+            userPlayer = {
+                ...userPlayer,
+                fga: userPlayer.fga + 1,
+                fgm: userPlayer.fgm + 1,
+                fgp:
+                    Math.round(
+                        ((userPlayer.fgm + 1) / (userPlayer.fga + 1)) * 1000
+                    ) / 10,
+            };
+            update((p) => [
+                ...p.filter((p) => p.name !== userPlayer.name),
+                userPlayer,
+            ]);
+            console.log({ players, userPlayer });
+
+            update((p) => quickSortPlayers(p, 0, p.length - 1));
+        },
+        addZeroUserScore: () => {
+            userPlayer = {
+                ...userPlayer,
+                fga: userPlayer.fga + 1,
+                fgm: userPlayer.fgm,
+                fgp:
+                    Math.round((userPlayer.fgm / (userPlayer.fga + 1)) * 1000) /
+                    10,
+            };
+            update(($players) => [
+                ...$players.filter((p) => p.name !== userPlayer.name),
+                userPlayer,
+            ]);
+            console.log({ players, userPlayer });
+
+            update((p) => quickSortPlayers(p, 0, p.length - 1));
+            $playersStore = $playersStore;
+        },
+
+        remove: (player: Player) => {
+            update(($players) =>
+                $players.filter((p) => p.name !== player.name)
+            );
+        },
+    };
+
+    function quickSortPlayers(
+        players: Player[],
+        left: number,
+        right: number
+    ): Player[] {
+        let l = left;
+        let r = right;
+
+        let p = players[Math.floor((l + r) / 2)].fgp;
+
+        while (l <= r) {
+            while (players[l].fgp > p) {
+                l++;
+            }
+            while (players[r].fgp < p) {
+                r--;
+            }
+
+            if (l <= r) {
+                [players[l], players[r]] = [players[r], players[l]];
+                l++;
+                r--;
+            }
+        }
+        if (left < r) quickSortPlayers(players, left, r);
+        if (l < right) quickSortPlayers(players, l, right);
+
+        return players;
+
+        // players = players;
+        // update(($players) => players);
+    }
+
+    // console.log(players);
+
+    // let indexName: string = 'players-2024-playoffs';
+    // addRecords(players, indexName);
+
+    // let userIndexName: string = 'user-index-0';
+
+    export { Player };
+</script>
+
+<div class="mx-auto my-2 max-w-md rounded overflow-hidden shadow-md text-xs">
+    <div class="flex bg-gray-200 px-2 py-2">
+        <div class="w-5/12 text-gray-700 text-left">Ballin</div>
+        <div class="w-5/12 flex justify-end items-center">
+            <p class="w-8 px-2 text-center">FGM</p>
+            <p class="w-8 px-2 text-center">FGA</p>
+        </div>
+        <div class="w-1/6 text-gray-700 text-right">FGP%</div>
+    </div>
+</div>
+
+<div class="mx-auto my-2 max-w-md rounded overflow-hidden shadow-md text-xs">
+    {#each $playersStore as player (player?.name)}
+        <div class="flex px-2 py-2 items-center {player.name == userPlayer.name ? "bg-orange-100" : ""}">
+            <div class="w-3/4 flex">
+                {#if player.name != userPlayer.name}
+                    <img
+                        class="w-10 h-10 mr-2 self-center object-cover rounded-full"
+                        src="https://cdn.nba.com/headshots/nba/latest/1040x760/{getPlayerID(
+                            player.name
+                        )}.png"
+                        alt="player?.name"
+                    />
+                {:else}
+                    <img
+                        src="src/lib/leo-nba.png"
+                        class="w-10 h-10 mr-2 self-center object-cover rounded-full"
+                        alt="User"
+                    />
+                {/if}
+                <img
+                    class="w-10 h-10 mr-2 self-center object-cover rounded-full"
+                    alt="away-logo"
+                    src="https://cdn.nba.com/logos/nba/{getTeamID(
+                        player.team
+                    )}/primary/L/logo.svg"
+                />
+                <div class="flex flex-col">
+                    <p class="text-sm font-bold">{player?.name}</p>
+                    <p class=" text-gray-600">
+                        {getTeamName(player?.team)
+                            .split("-")
+                            .map((word) => {
+                                return (
+                                    word[0].toUpperCase() + word.substring(1)
+                                );
+                            })
+                            .join(" ")}
+                    </p>
+                    <p class=" text-gray-600">
+                        {player?.team}
+                    </p>
+                </div>
+            </div>
+            <div class="w-5/12 flex justify-end items-center">
+                <p class="w-8 px-1 text-center">
+                    {Boolean(player?.fgm) ? player?.fgm : "-"}
+                </p>
+                <p class="w-8 px-1 text-center">
+                    {Boolean(player?.fga) ? player?.fga : "-"}
+                </p>
+            </div>
+            <p class="w-1/6 text-lg sm:text-xl font-bold text-right">
+                {Boolean(player?.fgp) ? player?.fgp?.toFixed(1) : "-"}
+            </p>
+        </div>
+    {/each}
+</div>
+
+<div class="flex border-t bg-gray-200">
+    <div class="w-1/2 px-2 py-2 text-center">
+        <button
+            on:click={() => playersStore.addOneUserScore()}
+            class="font-semibold text-gray-700"
+            >+ 1
+            <p class="font-light text-gray-600">
+                {(
+                    Math.round(
+                        ((userPlayer.fgm + 1) / (userPlayer.fga + 1)) * 1000
+                    ) / 10
+                ).toFixed(1)}
+            </p>
+        </button>
+    </div>
+    <div class="w-1/2 px-2 py-2 text-center">
+        <p class="text-gray-600">
+            <button
+                on:click={() => playersStore.addZeroUserScore()}
+                class="font-semibold"
+                >+ 0
+                <p class="font-light text-gray-600">
+                    {(
+                        Math.round(
+                            (userPlayer.fgm / (userPlayer.fga + 1)) * 1000
+                        ) / 10
+                    ).toFixed(1)}
+                </p></button
+            >
+        </p>
+    </div>
+</div>
+
+
+
+<div id="bottom-banner" tabindex="-1" class="fixed bottom-0 start-0 z-50 flex justify-between w-full p-4 border-t border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600">
+    <div class="flex items-center mx-auto">
+        <p class="flex items-center text-sm font-normal text-gray-500 dark:text-gray-400">
+            <span class="inline-flex p-1 me-3 bg-gray-200 rounded-full dark:bg-gray-600 w-6 h-6 items-center justify-center">
+                <svg class="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M18.435 7.546A2.32 2.32 0 0 1 17.7 5.77a3.354 3.354 0 0 0-3.47-3.47 2.322 2.322 0 0 1-1.776-.736 3.357 3.357 0 0 0-4.907 0 2.281 2.281 0 0 1-1.776.736 3.414 3.414 0 0 0-2.489.981 3.372 3.372 0 0 0-.982 2.49 2.319 2.319 0 0 1-.736 1.775 3.36 3.36 0 0 0 0 4.908A2.317 2.317 0 0 1 2.3 14.23a3.356 3.356 0 0 0 3.47 3.47 2.318 2.318 0 0 1 1.777.737 3.36 3.36 0 0 0 4.907 0 2.36 2.36 0 0 1 1.776-.737 3.356 3.356 0 0 0 3.469-3.47 2.319 2.319 0 0 1 .736-1.775 3.359 3.359 0 0 0 0-4.908ZM8.5 5.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Zm3 9.063a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm2.207-6.856-6 6a1 1 0 0 1-1.414-1.414l6-6a1 1 0 0 1 1.414 1.414Z"/>
+                </svg>
+                <span class="sr-only">Discount</span>
+            </span>
+            <span>Get 5% commission per sale <a href="https://flowbite.com" class="flex items-center ms-0 text-sm font-medium text-blue-600 md:ms-1 md:inline-flex dark:text-blue-500 hover:underline">Become a partner <svg class="w-3 h-3 ms-2 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">
+    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"/>
+  </svg></a></span>
+        </p>
+    </div>
+    <div class="flex items-center">
+        <button data-dismiss-target="#bottom-banner" type="button" class="flex-shrink-0 inline-flex justify-center w-7 h-7 items-center text-gray-400 hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 dark:hover:bg-gray-600 dark:hover:text-white">
+            <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+            </svg>
+            <span class="sr-only">Close banner</span>
+        </button>
+    </div>
+</div>
+
+
+<!-- src="https://a1.espncdn.com/combiner/i?img=/i/teamlogos/nba/500/scoreboard/{player.team.toLowerCase()}.png&h=70&w=70" -->
+
+<!-- <style>
+	button {
+		background-image: url($lib/remove.svg);
+	}
+</style> -->

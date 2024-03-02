@@ -1,0 +1,29 @@
+<script>
+  import {writable} from 'svelte/store';
+  import {onMount} from 'svelte';
+
+  let loading = false;
+  const store = writable({
+    list1: [],
+    list2: []
+  });
+
+  const getLists = async () => {
+    // @ts-ignore
+    const list1Promise = fetch('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTTUzn7-qinvq-jbUgQWNL-OfnXUFXfxbtwMs6-Utey3A&s').then(async(r) => await r.json()).then((r) => $store.list1 = [...$store.list1, ...r]);
+    const list2Promise = fetch('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTTUzn7-qinvq-jbUgQWNL-OfnXUFXfxbtwMs6-Utey3A&s').then(async(r) => await r.json()).then((r) => $store.list2 = r);
+  }
+
+  onMount(() => {
+    getLists();
+  });
+</script>
+
+<ul>
+  {#each $store.list1 as item}
+  <li>{item}</li>
+  {/each}
+  {#each $store.list2 as item}
+  <li>{item}</li>
+  {/each}
+</ul>

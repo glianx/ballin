@@ -4,10 +4,7 @@
     import { rawIDs as rawPlayerIDs } from "$lib/IDs/playerIDs";
     import { rawIDs as rawTeamIDs } from "$lib/IDs/teamIDs";
 
-    import("$lib/getPlayerInterface").Player;
-    import { userPlayerInfo } from "$lib/userPlayer/getUserPlayer";
     import { getPlayerID, getTeamID, getTeamName } from "$lib/IDs/getIDs";
-    import { addPlayerPack } from "$lib/algolia/algoliaAddPlayerPack";
 
     import { quickSortPlayers } from "$lib/sort";
 
@@ -16,53 +13,69 @@
     import { addRecords } from "$lib/algolia/algoliaAddRecord";
 
     import { searchClient } from "$lib/algolia/algoliaClient";
-    import { onMount } from "svelte";
 
-    let userPlayer: Player = userPlayerInfo;
+    interface Player {
+        name: string;
+        team: string;
+        age: number;
+
+        fgm: number;
+        fga: number;
+        fgp: number;
+
+        img: string;
+    }
+    let userPlayer: Player = {
+        name: "Leo Liang",
+        team: "TOR",
+        age: 12,
+
+        fga: 0,
+        fgm: 0,
+        fgp: -1,
+
+        img: "src/lib/leo-nba.png",
+    };
+
     let index = searchClient.initIndex("playerPack2024allStar");
-    let playersBST: Player[] = [];
 
+    // let players: Player[] = [];
     const createStore = () => {
-        const { subscribe, update, set }: Writable<Player[]> = writable([]);
-
+        let players: Player[] = [];
+        let { subscribe, update }: Writable<Player[]> = writable(players);
+        
         return {
             subscribe,
             getPlayers: async () => {
-                let players: Player[] = [];
-                await index
+                // Get all records as an iterator
+                let promise: Promise<void | Player[]> = await index
+                // const data = await  index
+
                     .browseObjects({
                         batch: (batch: any) => {
-                            players = players.concat(batch); // Accumulate players
+                            players = players.concat(batch);
                         },
                     })
-                    .then(() => {
-                        // create Binary Search Tree
+                    // .then((data) => data);
 
-                        for (let i: number = 0; i < players.length; i++) {
-                            let j: number = 0;
-                            while (playersBST[j] != null) {
-                                if (players[i].fgp < playersBST[j].fgp) {
-                                    j = 2 * j + 1;
-                                } else {
-                                    j = 2 * j + 2;
-                                }
-                            }
-                            playersBST[j] = players[i];
-                        }
-
-                        // set playersStore as sorted players with userPlayer
+                // update((p.players) => data);
+                    .then((players) => {
+                        console.log("then");
+                        console.log({ players });
+                        console.log("players[0] ", players[0]);
                         players.push(userPlayer);
                         quickSortPlayers(players, 0, players.length - 1);
-                        set(players);
-                    })
-                    .catch((error) => {
-                        console.error(
-                            "Failed to load players from Algolia",
-                            error
-                        );
-                        set([]); // In case of error, you might want to reset the store or handle differently
+
+                        // return players;
+
+                        console.log("outside");
+                        console.log({ players });
+                        console.log("players[0] ", players[0]);
+                        
+                        return players;
                     });
             },
+
             addOneUserScore: () => {
                 userPlayer = {
                     ...userPlayer,
@@ -73,10 +86,13 @@
                             ((userPlayer.fgm + 1) / (userPlayer.fga + 1)) * 1000
                         ) / 10,
                 };
+                update((p) => [
+                    ...p.filter((p) => p.name !== userPlayer.name),
+                    userPlayer,
+                ]);
+                console.log({ players, userPlayer });
 
-                let playersBSTwithUser: Player [] = returnPlayersBSTwithUser(playersBST);
-                let orderedPlayers: Player[] = [];
-                update((p) => returnPlayersFromBST(0, orderedPlayers, playersBSTwithUser));
+                update((p) => quickSortPlayers(p, 0, p.length - 1));
             },
             addZeroUserScore: () => {
                 userPlayer = {
@@ -84,76 +100,40 @@
                     fga: userPlayer.fga + 1,
                     fgm: userPlayer.fgm,
                     fgp:
-                        Math.round(
-                            (userPlayer.fgm / (userPlayer.fga + 1)) * 1000
-                        ) / 10,
+                        Math.round((userPlayer.fgm / (userPlayer.fga + 1)) * 1000) /
+                        10,
                 };
+                update((players) => [
+                    ...players.filter((p) => p.name !== userPlayer.name),
+                    userPlayer,
+                ]);
+                console.log({ players, userPlayer });
 
-                let playersBSTwithUser: Player [] = returnPlayersBSTwithUser(playersBST);
-                let orderedPlayers: Player[] = [];
-                update((p) => returnPlayersFromBST(0, orderedPlayers, playersBSTwithUser));
+                update((p) => quickSortPlayers(p, 0, p.length - 1));
+                $playersStore = $playersStore;
             },
 
             remove: (player: Player) => {
-                update(($players) =>
-                    $players.filter((p) => p.name !== player.name)
+                update((players) =>
+                    players.filter((p) => p.name !== player.name)
                 );
-            },
-        };
-    };
-
-    function returnPlayersBSTwithUser(playersBST: Player[]): Player[] {
-        let j: number = 0;
-        let newPlayersBST: Player[] = structuredClone(playersBST);
-        while (newPlayersBST[j] != null) {
-            if (userPlayer.fgp < newPlayersBST[j].fgp) {
-                j = 2 * j + 1;
-            } else {
-                j = 2 * j + 2;
             }
         }
-        newPlayersBST[j] = userPlayer;
-        return newPlayersBST;
-    }
-
-    function returnPlayersFromBST(
-        j: number,
-        orderedPlayers: Player[],
-        playersBSTwithUser: Player[]
-    ): Player[] {
-        // check if node is leaf
-        if (playersBSTwithUser[j] != null) {
-            returnPlayersFromBST(2 * j + 2, orderedPlayers, playersBSTwithUser);
-            orderedPlayers.push(playersBSTwithUser[j]);
-            returnPlayersFromBST(2 * j + 1, orderedPlayers, playersBSTwithUser);
-
-            return orderedPlayers;
-        }
-    }
+    };
 
     const playersStore = createStore();
 
-    let players: Player[] = [];
+    console.log("getplayers " + playersStore.getPlayers());
+    console.log("playersstore " + playersStore);
 
-    // Subscribe to the store and update local variable `players` whenever the store changes
-    playersStore.subscribe((value) => {
-        players = value;
-        console.log("subbed!");
-        console.log(players); // This will log the actual array of players
-    });
 
-    onMount(() => {
-        playersStore.getPlayers().then(() => {
-            console.log("Players have been fetched");
-            console.log(players);
-        });
-    });
-
-    addPlayerPack("playerPack2024allStar");
 
     export { Player };
 </script>
 
+<!-- {#await promise} -->
+<p>...waiting</p>
+<!-- {:then players} -->
 <div
     class="fixed top-0 start-0 justify-between w-full border-t border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 text-xs"
 >
@@ -174,7 +154,7 @@
 </div>
 
 <div class="mx-auto max-w-md rounded overflow-hidden shadow-md text-xs">
-    {#each $playersStore as player (player.objectID)}
+    {#each $playersStore as player (player?.name)}
         <div
             class="flex px-2 py-2 items-center {player.name == userPlayer.name
                 ? 'bg-orange-100'
@@ -191,7 +171,7 @@
                     />
                 {:else}
                     <img
-                        src={userPlayer.img}
+                        src="src/lib/leo-nba.png"
                         class="w-10 h-10 mr-2 self-center object-cover rounded-full"
                         alt="User"
                     />
@@ -214,6 +194,9 @@
                                 );
                             })
                             .join(" ")}
+                    </p>
+                    <p class=" text-gray-600">
+                        {player?.team}
                     </p>
                 </div>
             </div>
@@ -279,3 +262,12 @@
         </p>
     </div>
 </div>
+<!-- {/await} -->
+
+<!-- src="https://a1.espncdn.com/combiner/i?img=/i/teamlogos/nba/500/scoreboard/{player.team.toLowerCase()}.png&h=70&w=70" -->
+
+<!-- <style>
+	button {
+		background-image: url($lib/remove.svg);
+	}
+</style> -->
