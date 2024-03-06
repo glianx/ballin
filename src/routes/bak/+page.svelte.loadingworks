@@ -3,10 +3,12 @@
     import { rawData } from "$lib/playerPacks/playerPack2024allStar";
     import { rawIDs as rawPlayerIDs } from "$lib/IDs/playerIDs";
     import { rawIDs as rawTeamIDs } from "$lib/IDs/teamIDs";
-    
+
+    import("$lib/getPlayerInterface").Player;
+    import { userPlayerInfo } from "$lib/userPlayer/getUserPlayer";
     import { getPlayerID, getTeamID, getTeamName } from "$lib/IDs/getIDs";
     import { addPlayerPack } from "$lib/algolia/algoliaAddPlayerPack";
-    
+
     import { quickSortPlayers } from "$lib/sort";
 
     import { send, receive } from "$lib/transition";
@@ -16,57 +18,48 @@
     import { searchClient } from "$lib/algolia/algoliaClient";
     import { onMount } from "svelte";
 
-    interface Player {
-        name: string;
-        team: string;
-        age: number;
-
-        fgm: number;
-        fga: number;
-        fgp: number;
-
-        img: string;
-        objectID: number;
-    }
-    let userPlayer: Player = {
-        name: "Leo Liang",
-        team: "TOR",
-        age: 12,
-
-        fga: 0,
-        fgm: 0,
-        fgp: -1,
-
-        img: "src/lib/leo-nba.png",
-        objectID: -1,
-    };
-
+    let userPlayer: Player = userPlayerInfo;
     let index = searchClient.initIndex("playerPack2024allStar");
+    let playersBST: Player[] = [];
 
     const createStore = () => {
         const { subscribe, update, set }: Writable<Player[]> = writable([]);
-
         return {
             subscribe,
-            getPlayers: async () => {
-                let allPlayers: Player[] = [];
+            loadPlayers: async () => {
+                let players: Player[] = [];
                 await index
                     .browseObjects({
                         batch: (batch: any) => {
-                            allPlayers = allPlayers.concat(batch); // Accumulate players
+                            players = players.concat(batch); // Accumulate players
                         },
                     })
                     .then(() => {
-                        allPlayers.push(userPlayer);
-                        quickSortPlayers(allPlayers, 0, allPlayers.length - 1);
-                        set(allPlayers);
+                        // create Binary Search Tree
+
+                        for (let i: number = 0; i < players.length; i++) {
+                            let j: number = 0;
+                            while (playersBST[j] != null) {
+                                if (players[i].fgp < playersBST[j].fgp) {
+                                    j = 2 * j + 1;
+                                } else {
+                                    j = 2 * j + 2;
+                                }
+                            }
+                            playersBST[j] = players[i];
+                        }
+
+                        // set playersStore as sorted players with userPlayer
+                        players.push(userPlayer);
+                        quickSortPlayers(players, 0, players.length - 1);
+                        set(players);
                     })
                     .catch((error) => {
                         console.error(
                             "Failed to load players from Algolia",
                             error
                         );
-                        set([]); // In case of error, you might want to reset the store or handle differently
+                        set([]);
                     });
             },
             addOneUserScore: () => {
@@ -79,13 +72,13 @@
                             ((userPlayer.fgm + 1) / (userPlayer.fga + 1)) * 1000
                         ) / 10,
                 };
-                update((p) => [
-                    ...p.filter((p) => p.name !== userPlayer.name),
-                    userPlayer,
-                ]);
-                console.log({ players, userPlayer });
 
-                update((p) => quickSortPlayers(p, 0, p.length - 1));
+                let playersBSTwithUser: Player[] =
+                    returnPlayersBSTwithUser(playersBST);
+                let orderedPlayers: Player[] = [];
+                update((p) =>
+                    returnPlayersFromBST(0, orderedPlayers, playersBSTwithUser)
+                );
             },
             addZeroUserScore: () => {
                 userPlayer = {
@@ -97,23 +90,50 @@
                             (userPlayer.fgm / (userPlayer.fga + 1)) * 1000
                         ) / 10,
                 };
-                update(($players) => [
-                    ...$players.filter((p) => p.name !== userPlayer.name),
-                    userPlayer,
-                ]);
-                console.log({ players, userPlayer });
 
-                update((p) => quickSortPlayers(p, 0, p.length - 1));
-                $playersStore = $playersStore;
+                let playersBSTwithUser: Player[] =
+                    returnPlayersBSTwithUser(playersBST);
+                let orderedPlayers: Player[] = [];
+                update((p) =>
+                    returnPlayersFromBST(0, orderedPlayers, playersBSTwithUser)
+                );
             },
-
-            : (player: Player) => {
+            remove: (player: Player) => {
                 update(($players) =>
                     $players.filter((p) => p.name !== player.name)
                 );
             },
         };
     };
+
+    function returnPlayersBSTwithUser(playersBST: Player[]): Player[] {
+        let j: number = 0;
+        let newPlayersBST: Player[] = structuredClone(playersBST);
+        while (newPlayersBST[j] != null) {
+            if (userPlayer.fgp < newPlayersBST[j].fgp) {
+                j = 2 * j + 1;
+            } else {
+                j = 2 * j + 2;
+            }
+        }
+        newPlayersBST[j] = userPlayer;
+        return newPlayersBST;
+    }
+
+    function returnPlayersFromBST(
+        j: number,
+        orderedPlayers: Player[],
+        playersBSTwithUser: Player[]
+    ): Player[] {
+        // check if node exists
+        if (playersBSTwithUser[j] != null) {
+            returnPlayersFromBST(2 * j + 2, orderedPlayers, playersBSTwithUser);
+            orderedPlayers.push(playersBSTwithUser[j]);
+            returnPlayersFromBST(2 * j + 1, orderedPlayers, playersBSTwithUser);
+
+            return orderedPlayers;
+        }
+    }
 
     const playersStore = createStore();
 
@@ -127,7 +147,7 @@
     });
 
     onMount(() => {
-        playersStore.getPlayers().then(() => {
+        playersStore.loadPlayers().then(() => {
             console.log("Players have been fetched");
             console.log(players);
         });
@@ -139,7 +159,7 @@
 </script>
 
 <div
-    class="fixed top-0 start-0 justify-between w-full border-t border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 text-xs"
+    class="fixed top-0 start-0 justify-between w-full bg-gray-50 dark:bg-gray-700 text-xs"
 >
     <div class="flex bg-gray-200 px-2 py-3">
         <div class="w-5/12 text-gray-700 text-left">Ballin</div>
@@ -147,21 +167,21 @@
             <p class="w-8 px-2 text-center">FGM</p>
             <p class="w-8 px-2 text-center">FGA</p>
         </div>
-        <div class="w-1/6 text-gray-700 text-right">FGP%</div>
+        <div class="w-1/6 text-gray-700 text-right">FG%</div>
     </div>
 </div>
 
-<div class="mx-auto max-w-md rounded overflow-hidden text-xs">
-    <div class="flex bg-gray-200 px-2 py-3">
-        <div class="w-1/6 text-gray-700 text-right">Placeholder</div>
+<div class="mx-auto rounded overflow-hidden text-xs">
+    <div class="flex px-2 py-3">
+        <div class="w-1/6 text-white text-right">Placeholder</div>
     </div>
 </div>
 
-<div class="mx-auto max-w-md rounded overflow-hidden shadow-md text-xs">
+<div class="mx-auto rounded overflow-hidden text-xs">
     {#each $playersStore as player (player.objectID)}
         <div
             class="flex px-2 py-2 items-center {player.name == userPlayer.name
-                ? 'bg-orange-100'
+                ? 'bg-orange-300'
                 : ''}"
         >
             <div class="w-3/4 flex">
@@ -175,7 +195,7 @@
                     />
                 {:else}
                     <img
-                        src="src/lib/leo-nba.png"
+                        src="src/lib/userPlayer/user.png"
                         class="w-10 h-10 mr-2 self-center object-cover rounded-full"
                         alt="User"
                     />
@@ -199,9 +219,6 @@
                             })
                             .join(" ")}
                     </p>
-                    <p class=" text-gray-600">
-                        {player?.team}
-                    </p>
                 </div>
             </div>
             <div class="w-5/12 flex justify-end items-center">
@@ -216,15 +233,28 @@
                 {player?.fgp >= 0 ? player?.fgp.toFixed(1) : "-"}
             </p>
         </div>
+        <!-- <button on:click={() => playersStore.remove(player)} aria-label="Remove">x</button> -->
     {/each}
 </div>
 
-<div class="flex border-t bg-gray-200">
-    <div class="w-1/2 px-2 py-2 text-center">
+<div class="flex border-t">
+    <div class="px-2 py-2 text-center">
         <p class="text-gray-600">
-            <button
-                >Placeholder
-                <p class="font-light text-gray-600">Placeholder</p></button
+            <button>
+                {#if $playersStore.length == 0}
+                    <img
+                        class="w-10 h-10 mr-2 self-center object-cover rounded-full"
+                        src="src/lib/loading.gif"
+                        alt="loading"
+                    />
+                {:else}
+                    <img
+                        class="w-10 h-10 mr-2 self-center object-cover rounded-full"
+                        src="src/lib/blank.png"
+                        alt="Placeholder"
+                    />
+                {/if}
+                <p class="font-light text-gray-600" /></button
             >
         </p>
     </div>
@@ -233,13 +263,13 @@
 <div
     id="bottom-banner"
     tabindex="-1"
-    class="fixed bottom-0 start-0 z-50 flex justify-between w-full border-t border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600"
+    class="fixed bottom-0 start-0 flex justify-between w-full bg-gray-50 dark:bg-gray-700 "
 >
     <div class="w-1/2 px-2 py-2 text-center">
         <button
             on:click={() => playersStore.addOneUserScore()}
             class="font-semibold text-gray-700"
-            >+ 1
+            >MAKE
             <p class="font-light text-gray-600">
                 {(
                     Math.round(
@@ -254,7 +284,7 @@
             <button
                 on:click={() => playersStore.addZeroUserScore()}
                 class="font-semibold"
-                >+ 0
+                >MISS
                 <p class="font-light text-gray-600">
                     {(
                         Math.round(
@@ -266,12 +296,3 @@
         </p>
     </div>
 </div>
-<!-- {/await} -->
-
-<!-- src="https://a1.espncdn.com/combiner/i?img=/i/teamlogos/nba/500/scoreboard/{player.team.toLowerCase()}.png&h=70&w=70" -->
-
-<!-- <style>
-	button {
-		background-image: url($lib/remove.svg);
-	}
-</style> -->

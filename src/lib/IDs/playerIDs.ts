@@ -832,6 +832,7 @@ Sasha Kaun,201619
 Sasha Pavlovic,2562
 Sasha Vujacic,2756
 Scott Machado,203159
+Scottie Barnes,1630567
 Scotty Hopson,203816
 Sean Kilpatrick,203930
 Sean Williams,201157
