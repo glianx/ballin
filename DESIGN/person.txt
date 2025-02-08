@@ -1,0 +1,8 @@
+person 
+- int name
+- age
+- String school
+- Project [] projects
+- String [] skills
+- String [] tags
+

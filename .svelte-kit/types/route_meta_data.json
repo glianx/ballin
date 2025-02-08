@@ -1,0 +1,10 @@
+{
+	"/": [
+		"src/routes/+page.server.ts"
+	],
+	"/chat-page/ collab-requests": [],
+	"/view-profiles": [],
+	"/[slug]": [
+		"src/routes/[slug]/+page.server.ts"
+	]
+}
