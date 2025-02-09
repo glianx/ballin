@@ -48,10 +48,12 @@
         const userRef = ref(db, `users/${currentUser.uid}`);
 
         try {
+            // Fetch the snapshot of the user's profile data.
             const snapshot = await get(userRef);
             if (snapshot.exists()) {
                 const data = snapshot.val();
 
+                // Update the local profile variable with data from the database.
                 profile = {
                     name: data.name || "",
                     username: data.username || "",
