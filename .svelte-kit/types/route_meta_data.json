@@ -2,8 +2,12 @@
 	"/": [
 		"src/routes/+page.server.ts"
 	],
+	"/add-project": [
+		"src/routes/add-project/+page.server.ts"
+	],
 	"/chat-page/ collab-requests": [],
 	"/view-profiles": [],
+	"/view-projects": [],
 	"/[slug]": [
 		"src/routes/[slug]/+page.server.ts"
 	]

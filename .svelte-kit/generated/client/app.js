@@ -6,15 +6,19 @@ export const nodes = [
 	() => import('./nodes/2'),
 	() => import('./nodes/3'),
 	() => import('./nodes/4'),
-	() => import('./nodes/5')
+	() => import('./nodes/5'),
+	() => import('./nodes/6'),
+	() => import('./nodes/7')
 ];
 
 export const server_loads = [];
 
 export const dictionary = {
 		"/": [~2],
-		"/chat-page/ collab-requests": [4],
-		"/view-profiles": [5],
+		"/add-project": [~4],
+		"/chat-page/ collab-requests": [5],
+		"/view-profiles": [6],
+		"/view-projects": [7],
 		"/[slug]": [~3]
 	};
 

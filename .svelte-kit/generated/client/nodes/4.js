@@ -1,1 +1,1 @@
-export { default as component } from "../../../../src/routes/chat-page/ collab-requests/+page.svelte";
+export { default as component } from "../../../../src/routes/add-project/+page.svelte";
