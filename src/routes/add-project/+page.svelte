@@ -84,10 +84,10 @@
     }
 </script>
 
-<div class="min-h-screen bg-background">
+<div class="min-h-screen bg-background pb-16">
     <!-- Hero section with image upload -->
-    <div class="relative h-[300px] w-full">
-        <label for="image-upload" class="block w-full h-full cursor-pointer">
+    <div class="relative h-[300px] w-full bg-gradient-to-r from-primary/10 to-primary/5">
+        <label for="image-upload" class="block w-full h-full cursor-pointer hover:opacity-90 transition-opacity">
             {#if imageFile?.[0]}
                 <img 
                     src={URL.createObjectURL(imageFile[0])} 
@@ -95,119 +95,129 @@
                     class="w-full h-full object-cover"
                 />
             {:else}
-                <div class="w-full h-full bg-muted flex items-center justify-center">
+                <div class="w-full h-full flex items-center justify-center border-2 border-dashed border-muted-foreground/25">
                     <div class="text-center">
-                        <p class="text-2xl mb-2">📸</p>
-                        <p class="text-muted-foreground">Click to upload project image</p>
+                        <p class="text-4xl mb-3">📸</p>
+                        <p class="text-muted-foreground font-medium">Click to upload project image</p>
+                        <p class="text-sm text-muted-foreground/75 mt-1">Recommended: 1200x600px</p>
                     </div>
                 </div>
             {/if}
+            <input
+                id="image-upload"
+                type="file"
+                accept="image/*"
+                class="hidden"
+                bind:files={imageFile}
+            />
         </label>
-        <input 
-            id="image-upload"
-            type="file"
-            accept="image/*"
-            class="hidden"
-            bind:files={imageFile}
-        />
     </div>
 
-    <!-- Project form -->
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 -mt-32 relative">
         {#if error}
-            <div class="fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded" role="alert">
+            <div class="fixed top-4 right-4 bg-destructive/15 border border-destructive text-destructive px-4 py-3 rounded-lg shadow-lg" role="alert" transition:fade>
                 <span class="block sm:inline">{error}</span>
             </div>
         {/if}
+
         <div transition:fade>
-            <Card.Root class="w-full">
-                <form on:submit|preventDefault={handleSubmit}>
-                    <Card.Header class="text-center space-y-4">
-                        <Input
-                            type="text"
-                            placeholder="Project Title"
-                            class="text-3xl text-center"
-                            bind:value={project.title}
-                        />
-                        <div class="space-y-2">
-                            <Input
-                                type="text"
-                                placeholder="Project Status (e.g., Active Development)"
-                                bind:value={project.status}
-                            />
-                            <div class="flex flex-wrap gap-2">
-                                {#each project.technologies as tech}
-                                    <Badge variant="outline" class="cursor-pointer" on:click={() => removeTechnology(tech)}>
-                                        {tech} ✕
-                                    </Badge>
-                                {/each}
-                            </div>
-                            <div class="flex gap-2">
-                                <Input
-                                    type="text"
-                                    placeholder="Add Technology"
-                                    bind:value={newTechnology}
-                                />
-                                <Button type="button" variant="outline" on:click={addTechnology}>Add</Button>
-                            </div>
-                        </div>
+            <Card.Root class="w-full backdrop-blur-sm bg-background/95">
+                <form on:submit|preventDefault={handleSubmit} class="space-y-8">
+                    <Card.Header class="space-y-4">
+                        <Card.Title class="text-2xl font-bold text-center">Add New Project</Card.Title>
+                        <Card.Description class="text-center">Share your latest creation with the world</Card.Description>
                     </Card.Header>
 
-                    <Card.Content class="space-y-6">
-                        <!-- Project Overview -->
-                        <div>
-                            <Label for="description">Project Overview</Label>
-                            <Textarea
-                                id="description"
-                                placeholder="Describe your project..."
-                                class="mt-2"
-                                bind:value={project.description}
-                            />
+                    <Card.Content class="space-y-8">
+                        <!-- Basic Info Section -->
+                        <div class="space-y-4">
+                            <h3 class="text-lg font-semibold">Basic Information</h3>
+                            <Separator />
+                            <div class="grid gap-6">
+                                <div class="space-y-2">
+                                    <Label for="title">Project Title</Label>
+                                    <Input id="title" bind:value={project.title} placeholder="Enter project title" required />
+                                </div>
+                                <div class="space-y-2">
+                                    <Label for="status">Project Status</Label>
+                                    <Input id="status" bind:value={project.status} placeholder="e.g., In Progress, Completed" />
+                                </div>
+                                <div class="space-y-2">
+                                    <Label for="description">Project Description</Label>
+                                    <Textarea
+                                        id="description"
+                                        bind:value={project.description}
+                                        placeholder="Describe your project..."
+                                        class="min-h-[100px]"
+                                    />
+                                </div>
+                            </div>
                         </div>
 
-                        <Separator />
-
-                        <!-- Key Features -->
-                        <div>
-                            <div class="flex justify-between items-center mb-4">
-                                <h2 class="text-xl font-semibold">Key Features</h2>
-                                <Button type="button" variant="outline" size="sm" on:click={addFeature}>
-                                    Add Feature
-                                </Button>
-                            </div>
+                        <!-- Technologies Section -->
+                        <div class="space-y-4">
+                            <h3 class="text-lg font-semibold">Technologies Used</h3>
+                            <Separator />
                             <div class="space-y-4">
+                                <div class="flex gap-2">
+                                    <Input
+                                        placeholder="Add a technology..."
+                                        bind:value={newTechnology}
+                                        on:keydown={(e) => e.key === 'Enter' && (e.preventDefault(), addTechnology())}
+                                    />
+                                    <Button type="button" on:click={addTechnology} variant="secondary">Add</Button>
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    {#each project.technologies as tech}
+                                        <Badge variant="secondary" class="px-3 py-1 cursor-pointer hover:bg-destructive/10" on:click={() => removeTechnology(tech)}>
+                                            {tech}
+                                            <span class="ml-2 opacity-70">×</span>
+                                        </Badge>
+                                    {/each}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Features Section -->
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-lg font-semibold">Key Features</h3>
+                                <Button type="button" variant="outline" size="sm" on:click={addFeature}>Add Feature</Button>
+                            </div>
+                            <Separator />
+                            <div class="space-y-6">
                                 {#each project.features as feature, i}
-                                    <Card.Root class="relative">
-                                        <Button 
+                                    <div class="space-y-4 p-4 rounded-lg bg-muted/50 relative group">
+                                        <button
                                             type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            class="absolute top-2 right-2"
+                                            class="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-destructive text-destructive-foreground rounded-full w-6 h-6 flex items-center justify-center"
                                             on:click={() => removeFeature(i)}
-                                        >
-                                            ✕
-                                        </Button>
-                                        <Card.Header>
+                                        >×</button>
+                                        <div class="space-y-2">
+                                            <Label for="feature-title-{i}">Feature Title</Label>
                                             <Input
-                                                type="text"
-                                                placeholder="Feature Title"
+                                                id="feature-title-{i}"
                                                 bind:value={feature.title}
+                                                placeholder="Enter feature title"
                                             />
+                                        </div>
+                                        <div class="space-y-2">
+                                            <Label for="feature-desc-{i}">Feature Description</Label>
                                             <Textarea
-                                                placeholder="Feature Description"
-                                                class="mt-2"
+                                                id="feature-desc-{i}"
                                                 bind:value={feature.description}
+                                                placeholder="Describe this feature..."
+                                                class="min-h-[80px]"
                                             />
-                                        </Card.Header>
-                                    </Card.Root>
+                                        </div>
+                                    </div>
                                 {/each}
                             </div>
                         </div>
                     </Card.Content>
 
-                    <Card.Footer class="flex justify-center gap-4">
-                        <Button type="submit" variant="default">Create Project</Button>
-                        <Button type="button" variant="outline">Cancel</Button>
+                    <Card.Footer class="flex justify-end">
+                        <Button type="submit" class="w-full sm:w-auto">Create Project</Button>
                     </Card.Footer>
                 </form>
             </Card.Root>
@@ -218,6 +228,6 @@
 <style>
     :global(body) {
         margin: 0;
-        padding: 0;
+        background: hsl(var(--background));
     }
 </style>

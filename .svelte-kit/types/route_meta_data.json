@@ -6,6 +6,7 @@
 		"src/routes/add-project/+page.server.ts"
 	],
 	"/chat-page/ collab-requests": [],
+	"/edit-profile": [],
 	"/view-profiles": [],
 	"/view-projects": [],
 	"/[slug]": [
