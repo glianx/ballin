@@ -10,6 +10,8 @@
     import { Badge } from "$lib/components/ui/badge";
     import { Upload } from "lucide-svelte";
     import { onMount } from 'svelte';
+    import { getDatabase, ref, update, get } from "firebase/database";
+    import { getAuth } from "firebase/auth";
 
     interface Profile {
         name: string;
@@ -34,26 +36,74 @@
     let error: string | null = null;
 
     onMount(() => {
-        // TODO: Fetch current user profile data
-        console.log('Edit Profile page mounted');
+        const auth = getAuth();
+        const currentUser = auth.currentUser;
+
+        if (!currentUser) {
+            console.error("No authenticated user found. Please log in first.");
+            return;
+        }
+
+        const db = getDatabase();
+        const userRef = ref(db, `users/${currentUser.uid}`);
+
+        try {
+            const snapshot = await get(userRef);
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+
+                profile = {
+                    name: data.name || "",
+                    username: data.username || "",
+                    bio: data.bio || "",
+                    email: data.email || "",
+                    website: data.website || "",
+                    skills: data.skills || []
+                };
+
+                console.log("Profile data loaded successfully:", profile);
+            } else {
+                console.log("No profile data available for this user.");
+            }
+        } catch (error) {
+            console.error("Error fetching profile data:", error);
+        }
     });
 
     async function handleSubmit() {
         try {
             error = null;
-            console.log('Submitting profile:', profile);
-            console.log('Avatar:', avatarFile?.[0]);
-            
             if (!profile.name || !profile.username) {
                 error = "Name and username are required";
                 return;
             }
 
-            // TODO: Add actual profile update logic here
+            const auth = getAuth();
+            const currentUser = auth.currentUser;
+            if (!currentUser) {
+                throw new Error("User not authenticated");
+            }
+            const userId = currentUser.uid;
+            const db = getDatabase();
             
+            // could possibly use firebase storage (not real-time db) here to add the photos in directly, up to yall
+
+            const updatedProfileData = {
+                name: profile.name,
+                username: profile.username,
+                bio: profile.bio,
+                email: profile.email,
+                website: profile.website,
+                skills: profile.skills,
+                updatedAt: new Date().toISOString()
+            };
+
+            const userRef = ref(db, `users/${userId}`);
+            await update(userRef, updatedProfileData);
+            console.log("Profile updated successfully");
         } catch (e) {
-            console.error('Error updating profile:', e);
-            error = e instanceof Error ? e.message : 'An error occurred while updating the profile';
+        console.error("Error updating profile:", e);
+        error = e instanceof Error ? e.message : "An error occurred while updating the profile";
         }
     }
 
